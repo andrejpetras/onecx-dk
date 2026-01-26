@@ -1,0 +1,9 @@
+include::onecx-test-dk-attributes.adoc[opts=optional]
+
+= OneCX Test Developer Keycloak
+
+
+== Configuration
+include::onecx-test-dk.adoc[opts=optional]
+
+include::onecx-test-dk-docs.adoc[opts=optional]

@@ -1,0 +1,112 @@
+---
+openapi: 3.0.3
+components:
+  schemas:
+    Realm:
+      type: object
+      description: A realm containing named clients and users.
+      properties:
+        name:
+          type: string
+          description: Realm display/name identifier.
+          example: "onecx"
+        roles:
+          type: object
+          description: Realm roles
+          additionalProperties:
+            $ref: '#/components/schemas/Role'
+        clients:
+          type: object
+          description: Map of client-id -> Client configuration.
+          additionalProperties:
+            $ref: '#/components/schemas/Client'
+        users:
+          type: object
+          description: Map of username (or chosen key) -> User record.
+          additionalProperties:
+            $ref: '#/components/schemas/User'
+    Role:
+      type: object
+      description: Realm role
+      properties:
+        description:
+          type: string
+        enabled:
+          type: boolean
+          description: Whether the role is enabled.
+          default: true
+          example: true
+    Client:
+      type: object
+      description: OAuth2/OIDC client registration within the realm.
+      properties:
+        clientSecret:
+          type: string
+          nullable: true
+          description: Client secret (present for confidential clients).
+          example: "s3cr3t-value"
+        confidential:
+          type: boolean
+          description: Whether the client is confidential.
+          default: true
+          example: true
+        scopes:
+          type: array
+          description: Allowed scopes for the client.
+          items:
+            type: string
+          uniqueItems: true
+          example: ["openid", "profile", "email"]
+        roles:
+          type: array
+          description: Client roles which may appear in issued tokens.
+          items:
+            type: string
+          uniqueItems: true
+          example: ["service:read", "service:write"]
+      required:
+        - clientId
+    User:
+      type: object
+      description: User account within the realm.
+      properties:
+        id:
+          type: string
+          description: Server-generated identifier (UUID).
+          example: "c8d8a30a-2bc7-43f3-8b7d-2e6f2a9f8f8c"
+        enabled:
+          type: boolean
+          description: Whether the user is enabled.
+          default: true
+          example: true
+        roles:
+          type: array
+          description: Realm or application roles assigned to the user.
+          items:
+            type: string
+          uniqueItems: true
+          example: ["user", "editor"]
+        name:
+          type: string
+          description: Full display name.
+          example: "Alice Example"
+        givenName:
+          type: string
+          description: First name (given name).
+          example: "Alice"
+        familyName:
+          type: string
+          description: Surname (family name).
+          example: "Example"
+        email:
+          type: string
+          format: email
+          description: Email address.
+          example: "alice@example.com"
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          description: Plaintext password (only used on create/update; never returned).
+      required:
+        - username

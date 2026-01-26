@@ -1,0 +1,9 @@
+app:
+  name: dk
+  image:
+    repository: "onecx/onecx-test-dk"
+  operator:
+    microservice:
+      spec:
+        description: OneCX Test Developer Keycloak
+        name: OneCX Test Developer Keycloak

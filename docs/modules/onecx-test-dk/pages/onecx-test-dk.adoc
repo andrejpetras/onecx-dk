@@ -1,0 +1,74 @@
+[.configuration-legend]
+icon:lock[title=Fixed at build time] Configuration property fixed at build time - All other configuration properties are overridable at runtime
+[.configuration-reference.searchable, cols="80,.^10,.^10"]
+|===
+
+h|[.header-title]##Configuration property##
+h|Type
+h|Default
+
+a| [[onecx-test-dk_onecx-test-dk-oidc-issuer]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-oidc-issuer[`onecx.test.dk.oidc.issuer`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.oidc.issuer+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Issuer configuration.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_OIDC_ISSUER+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_OIDC_ISSUER+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|required icon:exclamation-circle[title=Configuration property is required]
+
+a| [[onecx-test-dk_onecx-test-dk-oidc-token-lifetime]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-oidc-token-lifetime[`onecx.test.dk.oidc.token-lifetime`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.oidc.token-lifetime+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Token lifetime.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_OIDC_TOKEN_LIFETIME+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_OIDC_TOKEN_LIFETIME+++`
+endif::add-copy-button-to-env-var[]
+--
+|long
+|`+++3600+++`
+
+a| [[onecx-test-dk_onecx-test-dk-store-directory]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-store-directory[`onecx.test.dk.store.directory`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.store.directory+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Store directory.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_STORE_DIRECTORY+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_STORE_DIRECTORY+++`
+endif::add-copy-button-to-env-var[]
+--
+|string
+|
+
+|===
+

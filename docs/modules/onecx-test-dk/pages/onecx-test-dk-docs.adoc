@@ -1,0 +1,41 @@
+
+include::onecx-test-dk-attributes.adoc[opts=optional]
+
+{docker-registry}[Link to Docker registry]
+
+== Default properties
+
+.{properties-file}
+[%collapsible]
+====
+[source,properties,subs=attributes+]
+----
+onecx.test.dk.oidc.issuer=http://localhost:8080/realms/
+onecx.test.dk.store.directory=src/test/resources/data
+----
+====
+
+== Extensions
+.Extensions List
+[%collapsible]
+====
+include::onecx-test-dk-extensions.adoc[opts=optional]
+====
+
+== Helm
+
+{helm-registry}[Link to Helm registry]
+
+.Default values in {helm-file}
+[source,yaml]
+----
+app:
+  name: dk
+  image:
+    repository: "onecx/onecx-test-dk"
+  operator:
+    microservice:
+      spec:
+        description: OneCX Test Developer Keycloak
+        name: OneCX Test Developer Keycloak
+----
