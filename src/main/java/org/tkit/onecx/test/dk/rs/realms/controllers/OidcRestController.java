@@ -18,6 +18,7 @@ import jakarta.ws.rs.core.UriInfo;
 
 import org.tkit.onecx.test.dk.config.DkConfig;
 import org.tkit.onecx.test.dk.domain.model.*;
+import org.tkit.onecx.test.dk.domain.services.IssuerService;
 import org.tkit.onecx.test.dk.domain.services.KeyManager;
 import org.tkit.onecx.test.dk.domain.services.RealmService;
 import org.tkit.onecx.test.dk.domain.services.TokenService;
@@ -48,9 +49,8 @@ public class OidcRestController implements OidcApi {
     @Inject
     TokenService refreshTokenService;
 
-    private String issuer(String realm) {
-        return uriInfo.getBaseUri() + "realms/" + realm;
-    }
+    @Inject
+    IssuerService issuerService;
 
     @Override
     public Response getJwks(String realm) {
@@ -67,7 +67,7 @@ public class OidcRestController implements OidcApi {
     @Override
     public Response getOpenIdConfiguration(String realm) {
 
-        var base = issuer(realm);
+        var base = issuerService.issuer(uriInfo, realm);
 
         var result = new OpenIdConfigurationDTO()
                 .issuer(URI.create(base))
@@ -128,7 +128,7 @@ public class OidcRestController implements OidcApi {
             }
         }
 
-        var issuer = issuer(store.getName());
+        var issuer = issuerService.issuer(uriInfo, store.getName());
         var scopes = toScopes(scope);
 
         return switch (grantType) {
@@ -151,7 +151,7 @@ public class OidcRestController implements OidcApi {
         String token = auth.substring("Bearer ".length());
 
         try {
-            var claims = refreshTokenService.parse(issuer(realm), token);
+            var claims = refreshTokenService.parse(issuerService.issuer(uriInfo, realm), token);
 
             var dto = new UserInfoDTO().sub(claims.getSubject());
             if (claims.hasClaim(ClaimNames.EMAIL_VERIFIED)) {
@@ -192,7 +192,8 @@ public class OidcRestController implements OidcApi {
         }
 
         try {
-            var refreshToken1 = refreshTokenService.parseRefreshToken(issuer(store.getName()), refreshToken);
+            var refreshToken1 = refreshTokenService.parseRefreshToken(issuerService.issuer(uriInfo, store.getName()),
+                    refreshToken);
 
             if (!client.getClientId().equals(refreshToken1.getClientId())) {
                 return error(Response.Status.BAD_REQUEST, "invalid_grant", "refresh_token not for this client");

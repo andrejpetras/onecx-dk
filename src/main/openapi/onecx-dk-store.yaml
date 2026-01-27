@@ -44,7 +44,6 @@ components:
           type: string
           nullable: true
           description: Client secret (present for confidential clients).
-          example: "s3cr3t-value"
         confidential:
           type: boolean
           description: Whether the client is confidential.
@@ -56,14 +55,18 @@ components:
           items:
             type: string
           uniqueItems: true
-          example: ["openid", "profile", "email"]
         roles:
           type: array
           description: Client roles which may appear in issued tokens.
           items:
             type: string
           uniqueItems: true
-          example: ["service:read", "service:write"]
+        redirectUris:
+          type: array
+          description: Client redirect URI.
+          items:
+            type: string
+          uniqueItems: true
       required:
         - clientId
     User:

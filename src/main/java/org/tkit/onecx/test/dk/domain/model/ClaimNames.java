@@ -13,7 +13,7 @@ public interface ClaimNames {
 
     String SCOPE = "scope";
 
-    String NONCE = "nonce";
+    String NONCE = Claims.nonce.name();
 
     String CLIENT_ID = "client_id";
 

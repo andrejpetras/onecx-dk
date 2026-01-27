@@ -20,13 +20,15 @@
       "clientSecret": "s3cr3t-value",
       "confidential": true,
       "scopes": ["openid", "profile", "email"],
-      "roles": ["service:read", "service:write"]
+      "roles": ["service:read", "service:write"],
+      "redirectUris": ["*"]
     },
     "web-portal": {
       "clientId": "web-portal",
       "confidential": false,
       "scopes": ["openid", "email"],
-      "roles": ["portal:user"]
+      "roles": ["portal:user"],
+      "redirectUris": ["*"]
     }
   },
   "users": {

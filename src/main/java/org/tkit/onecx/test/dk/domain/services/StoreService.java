@@ -105,6 +105,7 @@ public class StoreService {
         result.setConfidential(client.getConfidential() != null && client.getConfidential());
         result.setRoles(client.getRoles());
         result.setScopes(client.getScopes());
+        result.setRedirectUris(client.getRedirectUris());
         return result;
     }
 

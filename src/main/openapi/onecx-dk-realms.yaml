@@ -7,7 +7,177 @@ servers:
   - url: "http://onecx-test-dk:8080"
 tags:
   - name: oidc
+  - name: auth
 paths:
+  /realms/{realm}/login-actions/authenticate:
+    get:
+      operationId: loginPage
+      tags:
+        - auth
+      parameters:
+        - name: realm
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: redirect_uri
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: login page
+          content:
+            text/html:
+              schema:
+                type: string
+    post:
+      summary: Login user and continue authorization flow
+      description: |
+        Validates user credentials.  
+        On success, redirects to the specified `return_to` URL with an appended `as_user` query parameter.  
+        On failure, returns 401 with error text.
+      operationId: doLogin
+      tags:
+        - auth
+      parameters:
+        - name: realm
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Username to authenticate.
+                password:
+                  type: string
+                  format: password
+                  description: Password for authentication.
+                redirectUri:
+                  type: string
+                  nullable: true
+                  description: Callback URL.  If missing, server will redirect to `/`.
+      responses:
+        302:
+          description: Redirect after successful login
+          headers:
+            Location:
+              description: Redirect target with appended `as_user` query parameter.
+              schema:
+                type: string
+        401:
+          description: Invalid credentials
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Invalid credentials"
+  /realms/{realm}/protocol/openid-connect/auth:
+    get:
+      summary: OAuth2/OIDC authorization endpoint
+      description: |
+        Starts the OAuth 2.0/OIDC authorization flow.
+        - If `response_type=code`, the user is redirected to `redirect_uri` with `?code=...` (and optional `state`).
+        - If `response_type` is `id_token`, `token`, or `token id_token` (Implicit), the user is redirected with values in the URI **fragment**.
+        - If the user is not logged in (no `as_user`), the user agent is redirected to `/oidc/login?return_to=...`.
+      tags:
+        - auth
+      operationId: authorize
+      parameters:
+        - name: realm
+          required: true
+          in: path
+          schema:
+            type: string
+        - in: query
+          name: response_type
+          required: true
+          schema:
+            type: string
+            enum: [code, id_token, token, "token id_token"]
+          description: Response type (Authorization Code or Implicit).
+          example: code
+        - in: query
+          name: client_id
+          required: true
+          schema:
+            type: string
+          description: OAuth client identifier.
+          example: web-portal
+        - in: query
+          name: redirect_uri
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Registered redirect URI for the client.
+        - in: query
+          name: scope
+          required: false
+          schema:
+            type: string
+            description: Space-delimited scopes.
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          description: Opaque value to maintain state between request and callback.
+        - in: query
+          name: nonce
+          required: false
+          schema:
+            type: string
+          description: String value used to associate a client session with an ID token (for Implicit/Hybrid).
+        - in: query
+          name: code_challenge
+          required: false
+          schema:
+            type: string
+          description: PKCE code challenge, required for public clients using Authorization Code.
+        - in: query
+          name: code_challenge_method
+          required: false
+          schema:
+            type: string
+            enum: [plain, S256]
+            default: plain
+          description: PKCE code challenge method (default `plain`).
+        - in: query
+          name: as_user
+          required: false
+          schema:
+            type: string
+          description: Set internally by the login flow to indicate the authenticated username.
+      responses:
+        302:
+          description: Redirect to client or to login
+          headers:
+            Location:
+              description: |
+                Redirect target.
+                **Authorization Code:** `redirect_uri?code=...&state=...`  
+                **Implicit:** `redirect_uri#access_token=...&token_type=bearer&expires_in=3600&id_token=...&state=...`  
+                **Login required:** `/oidc/login?return_to=ENCODED_ORIGINAL_AUTH_REQUEST`
+              schema:
+                type: string
+        400:
+          description: Authorization error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
   /realms/{realm}/protocol/openid-connect/certs:
     get:
       operationId: getJwks
@@ -671,4 +841,21 @@ components:
         y:
           type: string
           description: Y coordinate for EC keys, base64url.
+
+    OAuthError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: OAuth2/OIDC error code
+          enum:
+            - invalid_request
+            - unauthorized_client
+            - access_denied
+            - unsupported_response_type
+            - realm_not_found
+        error_description:
+          type: string
+          description: Human-readable error description (optional).
 

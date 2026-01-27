@@ -10,6 +10,15 @@ public class Client {
     private boolean confidential = true;
     private Set<String> scopes = new HashSet<>();
     private Set<String> roles = new HashSet<>();
+    private Set<String> redirectUris = new HashSet<>();
+
+    public Set<String> getRedirectUris() {
+        return redirectUris;
+    }
+
+    public void setRedirectUris(Set<String> redirectUris) {
+        this.redirectUris = redirectUris;
+    }
 
     public boolean isConfidential() {
         return confidential;
