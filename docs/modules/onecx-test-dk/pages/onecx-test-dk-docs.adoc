@@ -12,6 +12,7 @@ include::onecx-test-dk-attributes.adoc[opts=optional]
 ----
 onecx.test.dk.oidc.issuer=http://localhost:8080/realms/
 onecx.test.dk.store.directory=src/test/resources/data
+quarkus.http.auth.proactive=false
 ----
 ====
 

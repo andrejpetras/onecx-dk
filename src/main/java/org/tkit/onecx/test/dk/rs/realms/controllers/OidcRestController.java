@@ -1,29 +1,31 @@
 package org.tkit.onecx.test.dk.rs.realms.controllers;
 
+import static org.tkit.onecx.test.dk.domain.utils.ScopeUtils.fromScopes;
+import static org.tkit.onecx.test.dk.domain.utils.ScopeUtils.toScopes;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Instant;
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
 import org.tkit.onecx.test.dk.config.DkConfig;
-import org.tkit.onecx.test.dk.domain.model.Client;
-import org.tkit.onecx.test.dk.domain.model.Realm;
-import org.tkit.onecx.test.dk.domain.model.User;
+import org.tkit.onecx.test.dk.domain.model.*;
 import org.tkit.onecx.test.dk.domain.services.KeyManager;
 import org.tkit.onecx.test.dk.domain.services.RealmService;
+import org.tkit.onecx.test.dk.domain.services.TokenService;
+import org.tkit.onecx.test.dk.domain.utils.Base64Utils;
 
 import gen.org.tkit.onecx.test.dk.rs.realms.OidcApi;
-import gen.org.tkit.onecx.test.dk.rs.realms.model.OpenIdConfigurationDTO;
-import gen.org.tkit.onecx.test.dk.rs.realms.model.TokenSuccessDTO;
+import gen.org.tkit.onecx.test.dk.rs.realms.model.*;
 import io.smallrye.jwt.algorithm.SignatureAlgorithm;
-import io.smallrye.jwt.build.Jwt;
-import io.smallrye.jwt.build.JwtClaimsBuilder;
 
 @ApplicationScoped
 public class OidcRestController implements OidcApi {
@@ -34,14 +36,32 @@ public class OidcRestController implements OidcApi {
     @Inject
     UriInfo uriInfo;
 
+    @Context
+    HttpHeaders headers;
+
     @Inject
     RealmService realmService;
 
     @Inject
     KeyManager keyManager;
 
+    @Inject
+    TokenService refreshTokenService;
+
     private String issuer(String realm) {
         return uriInfo.getBaseUri() + "realms/" + realm;
+    }
+
+    @Override
+    public Response getJwks(String realm) {
+        RSAPublicKey pub = keyManager.getPublicKey();
+        var kid = keyManager.getKid();
+        var dto = new JwksDTO()
+                .addKeysItem(new JwkDTO()
+                        .kty("RSA").use(JwkDTO.UseEnum.SIG).kid(kid).alg(SignatureAlgorithm.RS256.name())
+                        .n(Base64Utils.base64Url(pub.getModulus().toByteArray()))
+                        .e(Base64Utils.base64Url(pub.getPublicExponent().toByteArray())));
+        return Response.ok(dto).build();
     }
 
     @Override
@@ -57,11 +77,9 @@ public class OidcRestController implements OidcApi {
                 .userinfoEndpoint(URI.create(base + "/protocol/openid-connect/userinfo"))
                 .endSessionEndpoint(URI.create(base + "/protocol/openid-connect/logout"))
                 .checkSessionIframe(URI.create(base + "/protocol/openid-connect/login-status-iframe.html"))
-                .scopesSupported(List.of("openid", "profile", "email", "roles"))
-                .responseTypesSupported(List.of("none", "code", "id_token", "token", "id_token token",
-                        "code id_token", "code token", "code id_token token"))
-                .grantTypesSupported(
-                        List.of("authorization_code", "refresh_token", "implicit", "password", "client_credentials"))
+                .scopesSupported(Scopes.supportedScopes())
+                .responseTypesSupported(ResponseTypes.supportedResponseTypes())
+                .grantTypesSupported(GrantTypes.supportedGrantTypes())
                 .subjectTypesSupported(List.of(OpenIdConfigurationDTO.SubjectTypesSupportedEnum.PUBLIC))
                 .idTokenEncryptionAlgValuesSupported(List.of(SignatureAlgorithm.RS256.name()))
                 .codeChallengeMethodsSupported(List.of(OpenIdConfigurationDTO.CodeChallengeMethodsSupportedEnum.PLAIN,
@@ -73,8 +91,22 @@ public class OidcRestController implements OidcApi {
     }
 
     @Override
-    public Response getToken(String realm, String grantType, String clientId, String clientSecret, String username,
-            String password, String scope, String code, String redirectUri, String codeVerifier) {
+    public Response getToken(String realm, String grantType, String clientId, String authorization, String clientSecret,
+            String username, String password, String scope, String code, String redirectUri, String codeVerifier,
+            String refreshToken) {
+
+        if ((clientId == null || clientSecret == null) && authorization != null && authorization.startsWith("Basic ")) {
+            String decoded = new String(Base64.getDecoder().decode(authorization.substring(6)));
+            int idx = decoded.indexOf(':');
+            if (idx > 0) {
+                if (clientId == null) {
+                    clientId = decoded.substring(0, idx);
+                }
+                if (clientSecret == null) {
+                    clientSecret = decoded.substring(idx + 1);
+                }
+            }
+        }
 
         if (clientId == null || grantType == null) {
             return error(Response.Status.BAD_REQUEST, "invalid_request", "client_id and grant_type are required");
@@ -90,13 +122,63 @@ public class OidcRestController implements OidcApi {
             return error(Response.Status.UNAUTHORIZED, "invalid_client", "Unknown client");
         }
         var client = store.getClient(clientId);
+        if (client.isConfidential()) {
+            if (clientSecret == null || clientSecret.equals(client.getClientSecret())) {
+                return error(Response.Status.UNAUTHORIZED, "invalid_client", "Invalid client credentials");
+            }
+        }
+
+        var issuer = issuer(store.getName());
+        var scopes = toScopes(scope);
 
         return switch (grantType) {
-            case "client_credentials" -> grandTypeClientCredentials(store, client, scope);
-            case "password" -> grandTypePassword(store, client, scope, username, password);
-            case "authorization_code" -> grandTypeAuthorizationCode(store, client, code, redirectUri, codeVerifier);
+            case GrantTypes.CLIENT_CREDENTIALS -> grandTypeClientCredentials(issuer, store, client, scopes);
+            case GrantTypes.PASSWORD -> grandTypePassword(issuer, store, client, scopes, username, password);
+            case GrantTypes.AUTHORIZATION_CODE ->
+                grandTypeAuthorizationCode(issuer, store, client, code, redirectUri, codeVerifier);
+            case GrantTypes.REFRESH_TOKEN -> grantTypeRefreshToken(issuer, store, client, refreshToken, scopes);
             default -> grandTypeDefault();
         };
+    }
+
+    @Override
+    public Response getUserinfo(String realm) {
+        var auth = headers.getHeaderString("Authorization");
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(new ErrorTokenDTO().error(ErrorTokenDTO.ErrorEnum.MISSING_BEARER_TOKEN)).build();
+        }
+        String token = auth.substring("Bearer ".length());
+
+        try {
+            var claims = refreshTokenService.parse(issuer(realm), token);
+
+            var dto = new UserInfoDTO().sub(claims.getSubject());
+            if (claims.hasClaim(ClaimNames.EMAIL_VERIFIED)) {
+                dto.setEmailVerified(claims.getClaimValue(ClaimNames.EMAIL_VERIFIED, Boolean.class));
+            }
+            if (claims.hasClaim(ClaimNames.NAME)) {
+                dto.setName(claims.getClaimValueAsString(ClaimNames.NAME));
+            }
+            if (claims.hasClaim(ClaimNames.PREFERRED_USERNAME)) {
+                dto.setPreferredUsername(claims.getClaimValueAsString(ClaimNames.PREFERRED_USERNAME));
+            }
+            if (claims.hasClaim(ClaimNames.GIVEN_NAME)) {
+                dto.setGivenName(claims.getClaimValueAsString(ClaimNames.GIVEN_NAME));
+            }
+            if (claims.hasClaim(ClaimNames.FAMILY_NAME)) {
+                dto.setFamilyName(claims.getClaimValueAsString(ClaimNames.FAMILY_NAME));
+            }
+            if (claims.hasClaim(ClaimNames.EMAIL)) {
+                dto.setEmail(claims.getClaimValueAsString(ClaimNames.EMAIL));
+            }
+            return Response.ok(dto).build();
+
+        } catch (Exception e) {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(new ErrorTokenDTO().error(ErrorTokenDTO.ErrorEnum.INVALID_TOKEN).errorDescription(e.getMessage()))
+                    .build();
+        }
     }
 
     private Response grandTypeDefault() {
@@ -104,7 +186,43 @@ public class OidcRestController implements OidcApi {
                 "Supported: authorization_code, password, client_credentials");
     }
 
-    private Response grandTypePassword(Realm store, Client client, String scope, String username, String password) {
+    private Response grantTypeRefreshToken(String issuer, Realm store, Client client, String refreshToken, Set<String> scope) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return error(Response.Status.BAD_REQUEST, "invalid_request", "refresh_token required");
+        }
+
+        try {
+            var refreshToken1 = refreshTokenService.parseRefreshToken(issuer(store.getName()), refreshToken);
+
+            if (!client.getClientId().equals(refreshToken1.getClientId())) {
+                return error(Response.Status.BAD_REQUEST, "invalid_grant", "refresh_token not for this client");
+            }
+
+            if (refreshToken1.isExpired()) {
+                return error(Response.Status.BAD_REQUEST, "invalid_grant", "refresh_token expired");
+            }
+
+            var tmp = new HashSet<>(client.getScopes());
+            tmp.retainAll(scope);
+
+            User user = null;
+            var username = refreshToken1.getUsername();
+            if (username != null) {
+                user = store.getUser(username);
+                if (user == null || !user.isEnabled()) {
+                    return error(Response.Status.UNAUTHORIZED, "invalid_grant", "Invalid user");
+                }
+            }
+
+            return issueTokens(issuer, client, user, tmp, null, true, refreshToken1);
+
+        } catch (Exception e) {
+            return error(Response.Status.BAD_REQUEST, "invalid_grant", "Invalid refresh_token");
+        }
+    }
+
+    private Response grandTypePassword(String issuer, Realm store, Client client, Set<String> scope, String username,
+            String password) {
 
         if (username == null || password == null) {
             return error(Response.Status.BAD_REQUEST, "invalid_request", "username and password required");
@@ -119,12 +237,13 @@ public class OidcRestController implements OidcApi {
             return error(Response.Status.UNAUTHORIZED, "invalid_grant", "Invalid credentials");
         }
 
-        Set<String> scopes = parseScopes(scope, client);
+        var tmp = new HashSet<>(client.getScopes());
+        tmp.retainAll(scope);
 
-        return issueTokens(store, client, user, scopes, null);
+        return issueTokens(issuer, client, user, tmp, null, true, null);
     }
 
-    private Response grandTypeAuthorizationCode(Realm store, Client client, String code, String redirectUri,
+    private Response grandTypeAuthorizationCode(String issuer, Realm store, Client client, String code, String redirectUri,
             String codeVerifier) {
 
         if (code == null || redirectUri == null) {
@@ -182,82 +301,47 @@ public class OidcRestController implements OidcApi {
         if (ac.getScopes() != null) {
             scopes.addAll(ac.getScopes());
         }
-        return issueTokens(store, client, user, scopes, ac.getNonce());
+        return issueTokens(issuer, client, user, scopes, ac.getNonce(), true, null);
     }
 
-    private Response grandTypeClientCredentials(Realm store, Client client, String scope) {
-        Set<String> scopes = parseScopes(scope, client);
-        return issueTokens(store, client, null, scopes, null);
+    private Response grandTypeClientCredentials(String issuer, Realm store, Client client, Set<String> scope) {
+
+        var tmp = new HashSet<>(client.getScopes());
+        tmp.retainAll(scope);
+
+        return issueTokens(issuer, client, null, tmp, null, false, null);
     }
 
     private Response error(Response.Status s, String code, String desc) {
         return Response.status(s).entity(java.util.Map.of("error", code, "error_description", desc)).build();
     }
 
-    private Set<String> parseScopes(String scopeParam, Client client) {
-        Set<String> req = new HashSet<>();
-        if (scopeParam != null && !scopeParam.isBlank()) {
-            req.addAll(Arrays.asList(scopeParam.split(" ")));
-        }
-        if (client.getScopes() != null && !client.getScopes().isEmpty()) {
-            req.retainAll(client.getScopes());
-        }
-        return req;
-    }
+    private Response issueTokens(String issuer, Client client, User user, Set<String> scopes, String nonce,
+            boolean issueRefresh, RefreshToken fromRefresh) {
 
-    private Response issueTokens(Realm store, Client client, User user, Set<String> scopes, String nonce) {
-        Instant now = Instant.now();
-        Instant exp = now.plusSeconds(config.oidc().tokenLifetime());
-
-        JwtClaimsBuilder access = Jwt.claims();
-        access.issuer(issuer(store.getName()))
-                .issuedAt(now.getEpochSecond())
-                .expiresAt(exp.getEpochSecond())
-                .claim("jti", UUID.randomUUID().toString())
-                .audience(client.getClientId());
-
-        if (user != null) {
-            access.groups(user.getGroups());
-            access.subject(user.getId()).claim("preferred_username", user.getUsername());
-
-            access.claim("realm_access", Map.of("roles", store.filterRole(user.getRoles())));
-
-        } else {
-            access.subject("client:" + client.getClientId()).claim("client_id", client.getClientId());
-        }
-
-        String claimScope = null;
-        if (scopes != null && !scopes.isEmpty()) {
-            claimScope = String.join(" ", scopes);
-        }
-        if (claimScope != null) {
-            access.claim("scope", claimScope);
-        }
-
-        var accessToken = access.jws().keyId(keyManager.getKid()).sign(keyManager.getPrivateKey());
+        var accessToken = refreshTokenService.createAccessToken(issuer, user, client, scopes);
 
         var dto = new TokenSuccessDTO()
                 .accessToken(accessToken)
                 .expiresIn(config.oidc().tokenLifetime())
                 .tokenType(TokenSuccessDTO.TokenTypeEnum.BEARER);
 
-        if (claimScope != null) {
-            dto.scope(claimScope);
+        if (scopes != null) {
+            dto.scope(fromScopes(scopes));
         }
 
-        if (user != null && scopes.contains("openid")) {
-            JwtClaimsBuilder id = Jwt.claims();
-            id.issuer(issuer(store.getName()))
-                    .subject(user.getId())
-                    .issuedAt(now.getEpochSecond())
-                    .expiresAt(exp.getEpochSecond())
-                    .audience(client.getClientId())
-                    .claim("preferred_username", user.getUsername());
-            if (nonce != null) {
-                id.claim("nonce", nonce);
+        if (user != null && scopes != null && scopes.contains(Scopes.OPENID)) {
+            dto.idToken(refreshTokenService.createIdToken(issuer, user, client, nonce));
+        }
+
+        if (issueRefresh) {
+            if (fromRefresh != null) {
+                dto.setRefreshToken(refreshTokenService.rotateRefreshToken(fromRefresh));
+            } else {
+                dto.setRefreshToken(refreshTokenService.createRefreshToken(issuer, client.getClientId(),
+                        user != null ? user.getUsername() : null, scopes));
             }
-            String idToken = id.jws().keyId(keyManager.getKid()).sign(keyManager.getPrivateKey());
-            dto.idToken(idToken);
+            dto.setRefreshExpiresIn(config.oidc().refreshLifetime());
         }
         return Response.ok(dto).build();
     }

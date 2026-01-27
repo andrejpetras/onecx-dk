@@ -8,6 +8,72 @@ servers:
 tags:
   - name: oidc
 paths:
+  /realms/{realm}/protocol/openid-connect/certs:
+    get:
+      operationId: getJwks
+      summary: Retrieve JSON Web Key Set (JWKS)
+      description: Returns the public keys in JWKS format used for verifying JWS signatures.
+      tags:
+        - oidc
+      parameters:
+        - name: realm
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        200:
+          description: JWKS document
+          headers:
+            Cache-Control:
+              description: Caching policy for the JWKS (providers commonly allow caching).
+              schema:
+                type: string
+            Expires:
+              description: Expiration time for caches, if provided.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+        404:
+          description: Not found
+        500:
+          description: Server error
+
+  /realms/{realm}/protocol/openid-connect/userinfo:
+    get:
+      summary: Get user info from JWT
+      description: |
+        Validates the `Authorization: Bearer <token>` header, verifies the JWT (issuer, exp, skew, signature),
+        and returns a filtered user info object:
+        - `sub` (subject) is always returned
+        - `preferred_username` (if present in JWT)
+        - `roles` populated from the `groups` claim (if present)
+        - `scope` (if present; supports string or array of strings)
+      operationId: getUserinfo
+      tags:
+        - oidc
+      parameters:
+        - name: realm
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        200:
+          description: User info extracted from the validated token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        401:
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorToken'
   /realms/{realm}/protocol/openid-connect/token:
     post:
       tags:
@@ -18,6 +84,11 @@ paths:
         - name: realm
           required: true
           in: path
+          schema:
+            type: string
+        - name: Authorization
+          required: false
+          in: header
           schema:
             type: string
       requestBody:
@@ -79,6 +150,8 @@ components:
               redirect_uri:
                 type: string
               code_verifier:
+                type: string
+              refresh_token:
                 type: string
   responses:
     OpenIdConfigurationResponse:
@@ -173,19 +246,25 @@ components:
           type: string
           description: Signed JWT access token.
           example: eyJhbGciOiJSUzI1NiIsImtpZCI6Ij...access
+        refresh_token:
+          type: string
+          description: Signed JWT refresh token.
+          example: eyJhbGciOiJSUzI1NiIsImtpZCI6Ij...access
         token_type:
           type: string
           description: Token type indicator. This implementation returns `bearer`.
-          enum: [ bearer ]
+          enum: [ Bearer ]
         expires_in:
           type: integer
           format: int64
           description: Lifetime of the access token in seconds.
-          example: 3600
+        refresh_expires_in:
+          type: integer
+          format: int64
+          description: Lifetime of the refresh token in seconds.
         scope:
           type: string
           description: Space-delimited list of granted scopes (present if any scopes were granted).
-          example: "openid profile email"
         id_token:
           type: string
           description: >
@@ -494,15 +573,102 @@ components:
           type: boolean
           description: Whether the AS supports certificate-bound access tokens (RFC 8705).
           example: false
-        # Optional metadata often present in practice
         check_session_iframe:
           type: string
           format: uri
           description: IFrame for session management (OIDC Session Management draft).
           example: https://auth.example.com/oidc/checksession
-        # Any additional proprietary fields
-#        additional_properties:
-#          description: >
-#            Providers may include additional non-standard metadata fields.
-#          deprecated: true
-#      additionalProperties: true
+    UserInfo:
+      type: object
+      required:
+        - sub
+      additionalProperties: false
+      properties:
+        sub:
+          type: string
+          description: Subject identifier from the JWT `sub` claim.
+        name:
+          type: string
+          description: Preferred username from the `name` claim (if present).
+        preferred_username:
+          type: string
+          description: Preferred username from the `preferred_username` claim (if present).
+        given_name:
+          type: string
+          description: Given name from the `given_name` claim (if present).
+        family_name:
+          type: string
+          description: Family name from the `family_name` claim (if present).
+        email:
+          type: string
+          description: Email from the `email` claim (if present).
+        email_verified:
+          type: boolean
+          description: Email verified from the `email_verified` claim (if present).
+    ErrorToken:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          enum: ["invalid_token", "Missing bearer token"]
+          description: Indicates the token was present but invalid (expired, bad signature, wrong issuer, etc.).
+        error_description:
+          type: string
+          description: Diagnostic message from the verification error.
+
+    Jwks:
+      type: object
+      required:
+       - keys
+      properties:
+        keys:
+          type: array
+          description: Array of JWKs.
+          items:
+            $ref: '#/components/schemas/Jwk'
+    Jwk:
+      type: object
+      description: JSON Web Key as defined in RFC 7517.
+      required:
+        - kty
+      properties:
+        kty:
+          type: string
+          description: Key type.
+        use:
+          type: string
+          description: Intended use of the public key ("sig" or "enc").
+          enum: [sig, enc]
+        key_ops:
+          type: array
+          description: Permitted key operations (alternative to 'use').
+          items:
+            type: string
+        alg:
+          type: string
+          description: Algorithm intended for use with the key (e.g., "RS256").
+        kid:
+          type: string
+          description: Key identifier.
+        # --- RSA public key members (when kty == "RSA") ---
+        n:
+          type: string
+          description: RSA modulus, base64url without padding.
+          example: "oahUIzK1...base64url_modulus..."
+        e:
+          type: string
+          description: RSA public exponent, base64url without padding (usually "AQAB").
+          example: "AQAB"
+        # --- EC public key members (when kty == "EC") ---
+        crv:
+          type: string
+          description: Named curve (e.g., "P-256", "P-384", "P-521").
+        x:
+          type: string
+          description: X coordinate for EC keys, base64url.
+        y:
+          type: string
+          description: Y coordinate for EC keys, base64url.
+

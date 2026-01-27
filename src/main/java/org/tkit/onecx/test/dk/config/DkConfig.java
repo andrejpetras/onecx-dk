@@ -41,6 +41,20 @@ public interface DkConfig {
         @WithName("token-lifetime")
         @WithDefault("3600")
         long tokenLifetime();
+
+        /**
+         * Token skew.
+         */
+        @WithName("token-skew")
+        @WithDefault("30")
+        int tokenSkew();
+
+        /**
+         * Refresh token lifetime.
+         */
+        @WithName("refresh-token-lifetime")
+        @WithDefault("2592000")
+        long refreshLifetime();
     }
 
     interface StoreConfig {

@@ -9,6 +9,7 @@ public class User {
     private String id = UUID.randomUUID().toString();
     private String username;
     private boolean enabled = true;
+    private boolean emailVerified = true;
     private Set<String> roles = new HashSet<>();
     private Set<String> groups = new HashSet<>();
 
@@ -17,6 +18,14 @@ public class User {
     private String familyName;
     private String email;
     private String password;
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
 
     public boolean isEnabled() {
         return enabled;

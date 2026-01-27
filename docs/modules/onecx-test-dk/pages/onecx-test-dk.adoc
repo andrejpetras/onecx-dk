@@ -49,6 +49,48 @@ endif::add-copy-button-to-env-var[]
 |long
 |`+++3600+++`
 
+a| [[onecx-test-dk_onecx-test-dk-oidc-token-skew]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-oidc-token-skew[`onecx.test.dk.oidc.token-skew`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.oidc.token-skew+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Token skew.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_OIDC_TOKEN_SKEW+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_OIDC_TOKEN_SKEW+++`
+endif::add-copy-button-to-env-var[]
+--
+|int
+|`+++30+++`
+
+a| [[onecx-test-dk_onecx-test-dk-oidc-refresh-token-lifetime]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-oidc-refresh-token-lifetime[`onecx.test.dk.oidc.refresh-token-lifetime`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.oidc.refresh-token-lifetime+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Refresh token lifetime.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_OIDC_REFRESH_TOKEN_LIFETIME+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_OIDC_REFRESH_TOKEN_LIFETIME+++`
+endif::add-copy-button-to-env-var[]
+--
+|long
+|`+++2592000+++`
+
 a| [[onecx-test-dk_onecx-test-dk-store-directory]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-store-directory[`onecx.test.dk.store.directory`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++onecx.test.dk.store.directory+++[]
