@@ -1,5 +1,7 @@
 {
   "name": "onecx",
+  "displayName": "onecx test",
+  "enabled": true,
   "roles": {
     "user": {
       "description": "User role",
@@ -33,7 +35,7 @@
   },
   "users": {
     "alice": {
-      "id": "c8d8a30a-2bc7-43f3-8b7d-2e6f2a9f8f8c",
+      "id": "alice",
       "username": "alice",
       "enabled": true,
       "roles": ["user", "editor"],
@@ -45,7 +47,7 @@
       "password": "alice"
     },
     "service-bot": {
-      "id": "9a7e2d7b-0a2c-4d3a-8dba-5b7f3e2a9c45",
+      "id": "service-bot",
       "username": "service-bot",
       "enabled": true,
       "groups": ["service"],

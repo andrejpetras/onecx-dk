@@ -8,8 +8,13 @@ components:
       properties:
         name:
           type: string
-          description: Realm display/name identifier.
-          example: "onecx"
+          description: Realm id/name identifier.
+        displayName:
+          type: string
+          description: Realm display name identifier.
+        enabled:
+          type: boolean
+          default: "true"
         roles:
           type: object
           description: Realm roles

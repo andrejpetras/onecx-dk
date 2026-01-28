@@ -8,6 +8,10 @@ public class Realm {
 
     private String name;
 
+    private String displayName;
+
+    private boolean enabled;
+
     private final Map<String, Role> roles = new HashMap<>();
 
     private final Map<String, Client> clients = new HashMap<>();
@@ -24,6 +28,22 @@ public class Realm {
         return roles.get(name);
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public Set<String> filterRole(Set<String> data) {
         if (data.isEmpty()) {
             return Collections.emptySet();
@@ -35,7 +55,6 @@ public class Realm {
     }
 
     public void saveAuthCode(AuthorizationCode code) {
-        System.out.println("######## SAVE AUTH CODE ######### " + code.getCode());
         codes.put(code.getCode(), code);
     }
 

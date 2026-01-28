@@ -42,7 +42,6 @@ public class StoreService {
     ObjectMapper objectMapper;
 
     void onStart(@Observes StartupEvent ev) {
-        System.out.println("StoreService onStart");
         var dir = config.store().directory();
         if (dir.isEmpty()) {
             log.info("Store directory is empty!");
@@ -75,6 +74,8 @@ public class StoreService {
     private Realm map(RealmDTO dto) {
         var realm = new Realm();
         realm.setName(dto.getName());
+        realm.setDisplayName(dto.getDisplayName());
+        realm.setEnabled(dto.getEnabled() == null || dto.getEnabled());
         if (dto.getRoles() != null) {
             dto.getRoles().entrySet().forEach(entry -> realm.addRole(mapRole(entry)));
         }
