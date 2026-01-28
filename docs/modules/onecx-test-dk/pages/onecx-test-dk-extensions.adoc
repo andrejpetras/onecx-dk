@@ -105,6 +105,12 @@ h| Version
 | 3.27.1
 
 
+| quarkus-rest-qute
+
+| 
+| 
+| 3.27.1
+
 | quarkus-smallrye-jwt-build
 
 | 

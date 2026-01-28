@@ -20,6 +20,8 @@ import org.tkit.onecx.test.dk.domain.services.TokenService;
 
 import gen.org.tkit.onecx.test.dk.rs.realms.AuthApi;
 import gen.org.tkit.onecx.test.dk.rs.realms.model.OAuthErrorDTO;
+import io.quarkus.qute.Template;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @ApplicationScoped
 public class OidcAuthRestController implements AuthApi {
@@ -38,6 +40,9 @@ public class OidcAuthRestController implements AuthApi {
 
     @Inject
     IssuerService issuerService;
+
+    @Inject
+    Template login;
 
     @Override
     public Response authorize(String realm, String responseType, String clientId, URI redirectUri, String scope, String state,
@@ -163,21 +168,10 @@ public class OidcAuthRestController implements AuthApi {
     @Override
     public Response loginPage(String realm, String returnTo) {
         return Response.ok(
-                """
-                        <html>
-                            <body>
-                                <h3>Login %s</h3>
-                                <form method="post">
-                                  <input type="hidden" name="return_to" value="%s"/>
-                                  <label>Username <input name="username"/></label>
-                                  <br/>
-                                  <label>Password <input type="password" name="password"/></label>
-                                  <br/>
-                                  <br/>
-                                  <button type="submit">Sign in</button>
-                                </form>
-                            </body>
-                        </html>
-                        """.formatted(realm, returnTo == null ? "" : returnTo)).build();
+                login.data("container", new Container(realm, returnTo)).render()).build();
+    }
+
+    @RegisterForReflection
+    public record Container(String realm, String returnTo) {
     }
 }
