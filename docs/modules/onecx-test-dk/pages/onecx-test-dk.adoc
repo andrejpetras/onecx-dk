@@ -91,6 +91,27 @@ endif::add-copy-button-to-env-var[]
 |long
 |`+++2592000+++`
 
+a| [[onecx-test-dk_onecx-test-dk-oidc-auth-code-lifetime]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-oidc-auth-code-lifetime[`onecx.test.dk.oidc.auth-code-lifetime`]##
+ifdef::add-copy-button-to-config-props[]
+config_property_copy_button:+++onecx.test.dk.oidc.auth-code-lifetime+++[]
+endif::add-copy-button-to-config-props[]
+
+
+[.description]
+--
+Authorization code lifetime.
+
+
+ifdef::add-copy-button-to-env-var[]
+Environment variable: env_var_with_copy_button:+++ONECX_TEST_DK_OIDC_AUTH_CODE_LIFETIME+++[]
+endif::add-copy-button-to-env-var[]
+ifndef::add-copy-button-to-env-var[]
+Environment variable: `+++ONECX_TEST_DK_OIDC_AUTH_CODE_LIFETIME+++`
+endif::add-copy-button-to-env-var[]
+--
+|long
+|`+++3000+++`
+
 a| [[onecx-test-dk_onecx-test-dk-store-directory]] [.property-path]##link:#onecx-test-dk_onecx-test-dk-store-directory[`onecx.test.dk.store.directory`]##
 ifdef::add-copy-button-to-config-props[]
 config_property_copy_button:+++onecx.test.dk.store.directory+++[]

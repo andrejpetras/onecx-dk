@@ -35,6 +35,7 @@ public class Realm {
     }
 
     public void saveAuthCode(AuthorizationCode code) {
+        System.out.println("######## SAVE AUTH CODE ######### " + code.getCode());
         codes.put(code.getCode(), code);
     }
 

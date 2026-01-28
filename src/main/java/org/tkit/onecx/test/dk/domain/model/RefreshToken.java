@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.Set;
 
 import org.jose4j.jwt.JwtClaims;
-import org.tkit.onecx.test.dk.domain.utils.ScopeUtils;
 
 public class RefreshToken {
 
@@ -23,7 +22,7 @@ public class RefreshToken {
     }
 
     public Set<String> getScopes() {
-        return ScopeUtils.toScopes(claims.getClaimValueAsString(ClaimNames.SCOPE));
+        return Scopes.toScopes(claims.getClaimValueAsString(ClaimNames.SCOPE));
     }
 
     public String getUsername() {

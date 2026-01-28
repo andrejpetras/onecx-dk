@@ -1,6 +1,6 @@
 package org.tkit.onecx.test.dk.domain.model;
 
-import java.util.List;
+import java.util.*;
 
 public interface ResponseTypes {
 
@@ -8,10 +8,15 @@ public interface ResponseTypes {
     String CODE = "code";
     String ID_TOKEN = "id_token";
     String TOKEN = "token";
-    String ID_TOKEN_TOKEN = ID_TOKEN + " " + TOKEN;
-    String TOKEN_ID_TOKEN = TOKEN + " " + ID_TOKEN;
 
     static List<String> supportedResponseTypes() {
-        return List.of(NONE, CODE, ID_TOKEN, TOKEN, ID_TOKEN_TOKEN);
+        return List.of(NONE, CODE, ID_TOKEN, TOKEN);
+    }
+
+    static Set<String> toTypes(String value) {
+        if (value == null || value.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(Arrays.asList(value.split(" ")));
     }
 }

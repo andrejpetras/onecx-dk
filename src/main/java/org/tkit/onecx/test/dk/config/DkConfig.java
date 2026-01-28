@@ -55,6 +55,13 @@ public interface DkConfig {
         @WithName("refresh-token-lifetime")
         @WithDefault("2592000")
         long refreshLifetime();
+
+        /**
+         * Authorization code lifetime.
+         */
+        @WithName("auth-code-lifetime")
+        @WithDefault("3000")
+        long authCodeLifetime();
     }
 
     interface StoreConfig {

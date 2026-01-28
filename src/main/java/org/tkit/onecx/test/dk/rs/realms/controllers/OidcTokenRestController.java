@@ -1,35 +1,25 @@
 package org.tkit.onecx.test.dk.rs.realms.controllers;
 
-import static org.tkit.onecx.test.dk.domain.utils.ScopeUtils.fromScopes;
-import static org.tkit.onecx.test.dk.domain.utils.ScopeUtils.toScopes;
-
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
 import org.tkit.onecx.test.dk.config.DkConfig;
 import org.tkit.onecx.test.dk.domain.model.*;
 import org.tkit.onecx.test.dk.domain.services.IssuerService;
-import org.tkit.onecx.test.dk.domain.services.KeyManager;
 import org.tkit.onecx.test.dk.domain.services.RealmService;
 import org.tkit.onecx.test.dk.domain.services.TokenService;
-import org.tkit.onecx.test.dk.domain.utils.Base64Utils;
 
 import gen.org.tkit.onecx.test.dk.rs.realms.OidcApi;
 import gen.org.tkit.onecx.test.dk.rs.realms.model.*;
-import io.smallrye.jwt.algorithm.SignatureAlgorithm;
 
 @ApplicationScoped
-public class OidcRestController implements OidcApi {
+public class OidcTokenRestController implements OidcApi {
 
     @Inject
     DkConfig config;
@@ -37,58 +27,14 @@ public class OidcRestController implements OidcApi {
     @Inject
     UriInfo uriInfo;
 
-    @Context
-    HttpHeaders headers;
-
     @Inject
     RealmService realmService;
 
     @Inject
-    KeyManager keyManager;
-
-    @Inject
-    TokenService refreshTokenService;
+    TokenService tokenService;
 
     @Inject
     IssuerService issuerService;
-
-    @Override
-    public Response getJwks(String realm) {
-        RSAPublicKey pub = keyManager.getPublicKey();
-        var kid = keyManager.getKid();
-        var dto = new JwksDTO()
-                .addKeysItem(new JwkDTO()
-                        .kty("RSA").use(JwkDTO.UseEnum.SIG).kid(kid).alg(SignatureAlgorithm.RS256.name())
-                        .n(Base64Utils.base64Url(pub.getModulus().toByteArray()))
-                        .e(Base64Utils.base64Url(pub.getPublicExponent().toByteArray())));
-        return Response.ok(dto).build();
-    }
-
-    @Override
-    public Response getOpenIdConfiguration(String realm) {
-
-        var base = issuerService.issuer(uriInfo, realm);
-
-        var result = new OpenIdConfigurationDTO()
-                .issuer(URI.create(base))
-                .authorizationEndpoint(URI.create(base + "/protocol/openid-connect/auth"))
-                .tokenEndpoint(URI.create(base + "/protocol/openid-connect/token"))
-                .jwksUri(URI.create(base + "/protocol/openid-connect/certs"))
-                .userinfoEndpoint(URI.create(base + "/protocol/openid-connect/userinfo"))
-                .endSessionEndpoint(URI.create(base + "/protocol/openid-connect/logout"))
-                .checkSessionIframe(URI.create(base + "/protocol/openid-connect/login-status-iframe.html"))
-                .scopesSupported(Scopes.supportedScopes())
-                .responseTypesSupported(ResponseTypes.supportedResponseTypes())
-                .grantTypesSupported(GrantTypes.supportedGrantTypes())
-                .subjectTypesSupported(List.of(OpenIdConfigurationDTO.SubjectTypesSupportedEnum.PUBLIC))
-                .idTokenEncryptionAlgValuesSupported(List.of(SignatureAlgorithm.RS256.name()))
-                .codeChallengeMethodsSupported(List.of(OpenIdConfigurationDTO.CodeChallengeMethodsSupportedEnum.PLAIN,
-                        OpenIdConfigurationDTO.CodeChallengeMethodsSupportedEnum.S256))
-                .tokenEndpointAuthMethodsSupported(
-                        List.of(OpenIdConfigurationDTO.TokenEndpointAuthMethodsSupportedEnum.CLIENT_SECRET_BASIC,
-                                OpenIdConfigurationDTO.TokenEndpointAuthMethodsSupportedEnum.CLIENT_SECRET_POST));
-        return Response.ok(result).build();
-    }
 
     @Override
     public Response getToken(String realm, String grantType, String clientId, String authorization, String clientSecret,
@@ -129,7 +75,7 @@ public class OidcRestController implements OidcApi {
         }
 
         var issuer = issuerService.issuer(uriInfo, store.getName());
-        var scopes = toScopes(scope);
+        var scopes = Scopes.toScopes(scope);
 
         return switch (grantType) {
             case GrantTypes.CLIENT_CREDENTIALS -> grandTypeClientCredentials(issuer, store, client, scopes);
@@ -139,46 +85,6 @@ public class OidcRestController implements OidcApi {
             case GrantTypes.REFRESH_TOKEN -> grantTypeRefreshToken(issuer, store, client, refreshToken, scopes);
             default -> grandTypeDefault();
         };
-    }
-
-    @Override
-    public Response getUserinfo(String realm) {
-        var auth = headers.getHeaderString("Authorization");
-        if (auth == null || !auth.startsWith("Bearer ")) {
-            return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(new ErrorTokenDTO().error(ErrorTokenDTO.ErrorEnum.MISSING_BEARER_TOKEN)).build();
-        }
-        String token = auth.substring("Bearer ".length());
-
-        try {
-            var claims = refreshTokenService.parse(issuerService.issuer(uriInfo, realm), token);
-
-            var dto = new UserInfoDTO().sub(claims.getSubject());
-            if (claims.hasClaim(ClaimNames.EMAIL_VERIFIED)) {
-                dto.setEmailVerified(claims.getClaimValue(ClaimNames.EMAIL_VERIFIED, Boolean.class));
-            }
-            if (claims.hasClaim(ClaimNames.NAME)) {
-                dto.setName(claims.getClaimValueAsString(ClaimNames.NAME));
-            }
-            if (claims.hasClaim(ClaimNames.PREFERRED_USERNAME)) {
-                dto.setPreferredUsername(claims.getClaimValueAsString(ClaimNames.PREFERRED_USERNAME));
-            }
-            if (claims.hasClaim(ClaimNames.GIVEN_NAME)) {
-                dto.setGivenName(claims.getClaimValueAsString(ClaimNames.GIVEN_NAME));
-            }
-            if (claims.hasClaim(ClaimNames.FAMILY_NAME)) {
-                dto.setFamilyName(claims.getClaimValueAsString(ClaimNames.FAMILY_NAME));
-            }
-            if (claims.hasClaim(ClaimNames.EMAIL)) {
-                dto.setEmail(claims.getClaimValueAsString(ClaimNames.EMAIL));
-            }
-            return Response.ok(dto).build();
-
-        } catch (Exception e) {
-            return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(new ErrorTokenDTO().error(ErrorTokenDTO.ErrorEnum.INVALID_TOKEN).errorDescription(e.getMessage()))
-                    .build();
-        }
     }
 
     private Response grandTypeDefault() {
@@ -192,7 +98,7 @@ public class OidcRestController implements OidcApi {
         }
 
         try {
-            var refreshToken1 = refreshTokenService.parseRefreshToken(issuerService.issuer(uriInfo, store.getName()),
+            var refreshToken1 = tokenService.parseRefreshToken(issuerService.issuer(uriInfo, store.getName()),
                     refreshToken);
 
             if (!client.getClientId().equals(refreshToken1.getClientId())) {
@@ -320,7 +226,7 @@ public class OidcRestController implements OidcApi {
     private Response issueTokens(String issuer, Client client, User user, Set<String> scopes, String nonce,
             boolean issueRefresh, RefreshToken fromRefresh) {
 
-        var accessToken = refreshTokenService.createAccessToken(issuer, user, client, scopes);
+        var accessToken = tokenService.createAccessToken(issuer, user, client, scopes);
 
         var dto = new TokenSuccessDTO()
                 .accessToken(accessToken)
@@ -328,18 +234,18 @@ public class OidcRestController implements OidcApi {
                 .tokenType(TokenSuccessDTO.TokenTypeEnum.BEARER);
 
         if (scopes != null) {
-            dto.scope(fromScopes(scopes));
+            dto.scope(Scopes.fromScopes(scopes));
         }
 
         if (user != null && scopes != null && scopes.contains(Scopes.OPENID)) {
-            dto.idToken(refreshTokenService.createIdToken(issuer, user, client, nonce));
+            dto.idToken(tokenService.createIdToken(issuer, user, client, nonce));
         }
 
         if (issueRefresh) {
             if (fromRefresh != null) {
-                dto.setRefreshToken(refreshTokenService.rotateRefreshToken(fromRefresh));
+                dto.setRefreshToken(tokenService.rotateRefreshToken(fromRefresh));
             } else {
-                dto.setRefreshToken(refreshTokenService.createRefreshToken(issuer, client.getClientId(),
+                dto.setRefreshToken(tokenService.createRefreshToken(issuer, client.getClientId(),
                         user != null ? user.getUsername() : null, scopes));
             }
             dto.setRefreshExpiresIn(config.oidc().refreshLifetime());

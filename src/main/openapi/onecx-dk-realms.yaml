@@ -8,6 +8,8 @@ servers:
 tags:
   - name: oidc
   - name: auth
+  - name: user
+  - name: config
 paths:
   /realms/{realm}/login-actions/authenticate:
     get:
@@ -20,7 +22,7 @@ paths:
           in: path
           schema:
             type: string
-        - name: redirect_uri
+        - name: return_to
           required: false
           in: query
           schema:
@@ -64,7 +66,7 @@ paths:
                   type: string
                   format: password
                   description: Password for authentication.
-                redirectUri:
+                return_to:
                   type: string
                   nullable: true
                   description: Callback URL.  If missing, server will redirect to `/`.
@@ -90,7 +92,7 @@ paths:
         Starts the OAuth 2.0/OIDC authorization flow.
         - If `response_type=code`, the user is redirected to `redirect_uri` with `?code=...` (and optional `state`).
         - If `response_type` is `id_token`, `token`, or `token id_token` (Implicit), the user is redirected with values in the URI **fragment**.
-        - If the user is not logged in (no `as_user`), the user agent is redirected to `/oidc/login?return_to=...`.
+        - If the user is not logged in (no `as_user`), the user agent is redirected to login page.
       tags:
         - auth
       operationId: authorize
@@ -105,9 +107,8 @@ paths:
           required: true
           schema:
             type: string
-            enum: [code, id_token, token, "token id_token"]
+            enum: [code, id_token, token, "token id_token", "id_token token"]
           description: Response type (Authorization Code or Implicit).
-          example: code
         - in: query
           name: client_id
           required: true
@@ -184,7 +185,7 @@ paths:
       summary: Retrieve JSON Web Key Set (JWKS)
       description: Returns the public keys in JWKS format used for verifying JWS signatures.
       tags:
-        - oidc
+        - config
       parameters:
         - name: realm
           required: true
@@ -224,7 +225,7 @@ paths:
         - `scope` (if present; supports string or array of strings)
       operationId: getUserinfo
       tags:
-        - oidc
+        - user
       parameters:
         - name: realm
           required: true
@@ -274,7 +275,7 @@ paths:
   /realms/{realm}/.well-known/openid-configuration:
     get:
       tags:
-        - oidc
+        - config
       description: OpenID Provider Configuration
       operationId: getOpenIdConfiguration
       parameters:

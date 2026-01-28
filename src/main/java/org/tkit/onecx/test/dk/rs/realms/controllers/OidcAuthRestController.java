@@ -10,18 +10,22 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
+import org.tkit.onecx.test.dk.config.DkConfig;
 import org.tkit.onecx.test.dk.domain.model.AuthorizationCode;
 import org.tkit.onecx.test.dk.domain.model.ResponseTypes;
+import org.tkit.onecx.test.dk.domain.model.Scopes;
 import org.tkit.onecx.test.dk.domain.services.IssuerService;
 import org.tkit.onecx.test.dk.domain.services.RealmService;
 import org.tkit.onecx.test.dk.domain.services.TokenService;
-import org.tkit.onecx.test.dk.domain.utils.ScopeUtils;
 
 import gen.org.tkit.onecx.test.dk.rs.realms.AuthApi;
 import gen.org.tkit.onecx.test.dk.rs.realms.model.OAuthErrorDTO;
 
 @ApplicationScoped
 public class OidcAuthRestController implements AuthApi {
+
+    @Inject
+    DkConfig config;
 
     @Inject
     RealmService realmService;
@@ -77,7 +81,8 @@ public class OidcAuthRestController implements AuthApi {
         if (user == null || !user.isEnabled()) {
             return bad(OAuthErrorDTO.ErrorEnum.ACCESS_DENIED);
         }
-        Set<String> scopes = ScopeUtils.toScopes(scope);
+
+        Set<String> scopes = Scopes.toScopes(scope);
 
         responseType = responseType.toLowerCase();
 
@@ -91,7 +96,7 @@ public class OidcAuthRestController implements AuthApi {
             ac.setCodeChallenge(codeChallenge);
             ac.setCodeChallengeMethod(codeChallengeMethod);
             ac.setScopes(scopes);
-            ac.setExpiresAt(Instant.now().plusSeconds(300));
+            ac.setExpiresAt(Instant.now().plusSeconds(config.oidc().authCodeLifetime()));
             store.saveAuthCode(ac);
 
             var tmp = URI.create(redirectUri + (redirectUri.toString().contains("?") ? "&" : "?") + "code=" + ac.getCode()
@@ -99,21 +104,20 @@ public class OidcAuthRestController implements AuthApi {
             return Response.seeOther(tmp).build();
         }
 
-        if (ResponseTypes.TOKEN.equals(responseType) ||
-                ResponseTypes.ID_TOKEN.equals(responseType) ||
-                ResponseTypes.ID_TOKEN_TOKEN.equals(responseType) ||
-                ResponseTypes.TOKEN_ID_TOKEN.equals(responseType)) {
+        if (responseType.contains(ResponseTypes.TOKEN) || responseType.contains(ResponseTypes.ID_TOKEN)) {
 
             String fragment = "";
 
             var issuer = issuerService.issuer(uriInfo, realm);
 
-            if (responseType.contains(ResponseTypes.TOKEN)) {
+            Set<String> types = ResponseTypes.toTypes(responseType);
+
+            if (types.contains(ResponseTypes.TOKEN)) {
                 String at = tokenService.createAccessToken(issuer, user, client, scopes);
-                fragment += "access_token=" + at + "&token_type=bearer&expires_in=3600";
+                fragment += "access_token=" + at + "&token_type=bearer&expires_in=" + config.oidc().tokenLifetime();
             }
 
-            if (responseType.contains(ResponseTypes.ID_TOKEN)) {
+            if (types.contains(ResponseTypes.ID_TOKEN)) {
                 String idt = tokenService.createIdToken(issuer, user, client, nonce);
                 fragment += (fragment.isEmpty() ? "" : "&") + "id_token=" + idt;
             }
@@ -136,7 +140,7 @@ public class OidcAuthRestController implements AuthApi {
     }
 
     @Override
-    public Response doLogin(String realm, String username, String password, String redirectUri) {
+    public Response doLogin(String realm, String username, String password, String returnTo) {
 
         var store = realmService.getRealm(realm);
 
@@ -149,22 +153,22 @@ public class OidcAuthRestController implements AuthApi {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
         }
 
-        if (redirectUri == null) {
+        if (returnTo == null) {
             return Response.seeOther(URI.create("/")).build();
         }
-        String sep = redirectUri.contains("?") ? "&" : "?";
-        return Response.seeOther(URI.create(redirectUri + sep + "as_user=" + username)).build();
+        String sep = returnTo.contains("?") ? "&" : "?";
+        return Response.seeOther(URI.create(returnTo + sep + "as_user=" + username)).build();
     }
 
     @Override
-    public Response loginPage(String realm, String redirectUri) {
+    public Response loginPage(String realm, String returnTo) {
         return Response.ok(
                 """
                         <html>
                             <body>
                                 <h3>Login %s</h3>
-                                <form>
-                                  <input type="hidden" name="redirectUri" value="%s"/>
+                                <form method="post">
+                                  <input type="hidden" name="return_to" value="%s"/>
                                   <label>Username <input name="username"/></label>
                                   <br/>
                                   <label>Password <input type="password" name="password"/></label>
@@ -174,6 +178,6 @@ public class OidcAuthRestController implements AuthApi {
                                 </form>
                             </body>
                         </html>
-                        """.formatted(realm, redirectUri == null ? "" : redirectUri)).build();
+                        """.formatted(realm, returnTo == null ? "" : returnTo)).build();
     }
 }
