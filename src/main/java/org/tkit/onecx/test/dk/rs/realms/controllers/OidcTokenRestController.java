@@ -69,7 +69,7 @@ public class OidcTokenRestController implements OidcApi {
         }
         var client = store.getClient(clientId);
         if (client.isConfidential()) {
-            if (clientSecret == null || clientSecret.equals(client.getClientSecret())) {
+            if (clientSecret == null || !clientSecret.equals(client.getClientSecret())) {
                 return error(Response.Status.UNAUTHORIZED, "invalid_client", "Invalid client credentials");
             }
         }
