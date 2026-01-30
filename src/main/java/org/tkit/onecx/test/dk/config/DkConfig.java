@@ -30,12 +30,6 @@ public interface DkConfig {
     interface OidcConfig {
 
         /**
-         * Issuer configuration.
-         */
-        @WithName("issuer")
-        String issuer();
-
-        /**
          * Token lifetime.
          */
         @WithName("token-lifetime")
